@@ -1,0 +1,126 @@
+version: '3.5'
+
+networks:
+  cordite:
+
+services:
+  corda-db:
+    image: postgres:9.6
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./db-init:/docker-entrypoint-initdb.d/
+      - ./postgres_data:/var/lib/postgresql/data
+    networks:
+      cordite:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  network-map:
+    image: cordite/network-map:v0.4.4
+    ports:
+      - "8080:8080"
+    environment:
+      - NMS_PORT=8080
+      - NMS_DB=/opt/cordite/db
+      - NMS_AUTH_USERNAME=admin
+      - NMS_AUTH_PASSWORD=admin
+      - NMS_TLS=false
+      - NMS_DOORMAN=false
+      - NMS_CERTMAN=false
+      - NMS_CACHE_TIMEOUT=10S
+      - NMS_MONGO_CONNECTION_STRING=embed
+    networks:
+      cordite:
+
+  notary:
+    image: ${IMAGE_TAG:-cordite/cordite:edge}
+    ports:
+      - "8087:8080"
+      - "10000:10000"
+      - "10001:10001"
+    volumes:
+      - ./nodes/notary/node.conf:/etc/corda/node.conf
+      - ./nodes/notary/certificates:/opt/corda/certificates
+      - ./nodes/shared/additional-node-infos:/opt/corda/additional-node-infos
+      - ./nodes/shared/network-parameters:/opt/corda/network-parameters
+    environment:
+      - CORDITE_LEGAL_NAME=O=Notary,L=London,C=GB
+      - CORDITE_P2P_ADDRESS=notary:10000
+      - CORDITE_COMPATIBILITY_ZONE_URL=http://network-map:8080
+      - CORDITE_NOTARY=true
+      - CORDITE_DB_USER=postgres
+      - CORDITE_DB_PASS=postgres
+      - CORDITE_DB_DRIVER=org.postgresql.ds.PGSimpleDataSource
+      - CORDITE_DB_URL=jdbc:postgresql://corda-db:5432/notary
+      - CORDITE_DB_MAX_POOL_SIZE=5
+      - CORDITE_NMS=true
+    depends_on:
+      - "corda-db"
+    networks:
+      cordite:
+
+  manufacturer:
+    image: ${IMAGE_TAG:-cordite/cordite:edge}
+    restart: always:0
+    ports:
+      - "8081:8080"
+      - "10004:10004"
+      - "10005:10005"
+      - "2222:2222"
+    volumes:
+      - ./nodes/manufacturer/node.conf:/etc/corda/node.conf
+      - ./nodes/manufacturer/certificates:/opt/corda/certificates
+      - ./nodes/shared/cordapps:/opt/corda/cordapps
+    environment:
+      - CORDITE_LEGAL_NAME=O=Manufacturer,L=Amsterdam,C=NL
+      - CORDITE_P2P_ADDRESS=manufacturer:10004
+      - CORDITE_RPC_ADDRESS=manufacturer:10005
+      - CORDITE_COMPATIBILITY_ZONE_URL=http://network-map:8080
+      - CORDITE_DB_USER=postgres
+      - CORDITE_DB_PASS=postgres
+      - CORDITE_DB_DRIVER=org.postgresql.ds.PGSimpleDataSource
+      - CORDITE_DB_URL=jdbc:postgresql://corda-db:5432/manufacturer
+      - CORDITE_DB_MAX_POOL_SIZE=5
+      - CORDITE_LOG_MODE=json
+      - CORDA_ARGS=--logging-level=TRACE
+      - CORDITE_NMS=true
+    depends_on:
+      - "corda-db"
+    networks:
+      cordite:
+
+  distributer:
+    image: ${IMAGE_TAG:-cordite/cordite:edge}
+    restart: always:0
+    ports:
+      - "8082:8080"
+      - "10012:10012"
+      - "10013:10013"
+      - "3333:3333"
+    volumes:
+      - ./nodes/distributer/node.conf:/etc/corda/node.conf
+      - ./nodes/distributer/certificates:/opt/corda/certificates
+      - ./nodes/shared/cordapps:/opt/corda/cordapps
+    environment:
+      - CORDITE_LEGAL_NAME=O=Distributer,L=Paris,C=FR
+      - CORDITE_P2P_ADDRESS=distributer:10012
+      - CORDITE_RPC_ADDRESS=distributer:10013
+      - CORDITE_COMPATIBILITY_ZONE_URL=http://network-map:8080
+      - CORDITE_DB_USER=postgres
+      - CORDITE_DB_PASS=postgres
+      - CORDITE_DB_DRIVER=org.postgresql.ds.PGSimpleDataSource
+      - CORDITE_DB_URL=jdbc:postgresql://corda-db:5432/distributer
+      - CORDITE_DB_MAX_POOL_SIZE=5
+      - CORDITE_LOG_MODE=json
+      - CORDA_ARGS=--logging-level=TRACE
+      - CORDITE_NMS=true
+    networks:
+      cordite:
+    depends_on:
+      - "corda-db"
