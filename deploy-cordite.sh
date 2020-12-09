@@ -58,9 +58,7 @@ NMS_ID=$(docker-compose -p ${ENVIRONMENT_SLUG} ps -q network-map)
 for NODEINFO in nodeInfo-*
 do
     echo "Registering Notary by REST API"
-    curl -X POST -H "Authorization: Bearer $TOKEN" -H "accept: text/plain" -H "Content-Type: application/octet-stream" --data-binary @$NODEINFO http://localhost:8080//admin/api/notaries/nonValidating
-    echo -e "\xE2\x9C\x94 Registered ${NODEINFO} to ${NMS_ID}"
-    docker cp ${NODEINFO} ${NMS_ID}:/opt/cordite/db/inputs/nonvalidating-notaries/${NODEINFO}
+    curl -X POST "http://localhost:8080/admin/api/notaries/nonValidating" -H "accept: text/plain" -H "Content-Type: application/octet-stream" -H "Authorization: Bearer $TOKEN" --data-binary "@${NODEINFO}"
     rm ${NODEINFO}
     echo -e "\xE2\x9C\x94 copied ${NODEINFO} to ${NMS_ID}"
 done
@@ -83,13 +81,13 @@ do
 done
 
 # test endpoints
-for PORT in $ports
-do
-    while [[ "$(curl -sSfk -m 5 -o /dev/null -w ''%{http_code}'' https://localhost:${PORT}/api/)" != "200" ]]
-    do
-    echo -e "waiting for ${PORT} to return 200..."
-    sleep 5
-    done
-done
+#for PORT in $ports
+#do
+#    while [[ "$(curl -sSfk -m 5 -o /dev/null -w ''%{http_code}'' http://localhost:${PORT}/api/)" != "200" ]]
+#    do
+#    echo -e "waiting for ${PORT} to return 200..."
+#    sleep 5
+#    done
+#done
 
 echo -e "\xE2\x9C\x94 $(date) created environment ${ENVIRONMENT_SLUG}"
